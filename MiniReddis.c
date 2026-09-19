@@ -2,10 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 #define TABLE_SIZE 10
-
+struct ListNode {
+    char value[100];
+    struct ListNode *next;
+};
 struct Entry {
     char key[50];
-    char value[100];
+    struct ListNode *value;
     struct Entry *next;
 };
 unsigned long hashFunction(char key[])
@@ -59,13 +62,13 @@ void getEntry(struct Entry *table[], char key[])
         }
         current=current->next;
     }
-    printf("Entry not found");
+    printf("Entry not found\n");
 }
 void deleteEntry(struct Entry *table[], char key[]){
     int x=getIndex(key);
     struct Entry *current = table[x];
     if(current==NULL){
-        printf("Entry not found");
+        printf("Entry not found\n");
         return;
     }
     if(current->next==NULL){
@@ -75,7 +78,7 @@ void deleteEntry(struct Entry *table[], char key[]){
             free(current);
             return;
          }
-         printf("Entry not found");
+         printf("Entry not found\n");
          return;
     }
     while(current->next!=NULL){
@@ -88,7 +91,166 @@ void deleteEntry(struct Entry *table[], char key[]){
         }
         current=current->next;
     }
-    printf("Entry not found");
+    printf("Entry not found\n");
+}
+void LPUSH(struct Entry *table[], char key[], char value[])
+{
+    int x = getIndex(key);
+    struct Entry *current = table[x];
+
+    while (current != NULL)
+    {
+        if (strcmp(current->key, key) == 0)
+        {
+            struct ListNode *newNode = malloc(sizeof(struct ListNode));
+
+            if (newNode == NULL)
+            {
+                printf("Memory allocation failed\n");
+                return;
+            }
+
+            strcpy(newNode->value, value);
+            newNode->next = current->value;
+            current->value = newNode;
+
+            return;
+        }
+
+        current = current->next;
+    }
+    struct Entry *newEntry = malloc(sizeof(struct Entry));
+
+    if (newEntry == NULL)
+    {
+        printf("Memory allocation failed\n");
+        return;
+    }
+
+    strcpy(newEntry->key, key);
+    struct ListNode *newNode = malloc(sizeof(struct ListNode));
+
+    if (newNode == NULL)
+    {
+        printf("Memory allocation failed\n");
+        free(newEntry);
+        return;
+    }
+
+    strcpy(newNode->value, value);
+    newNode->next = NULL;
+    newEntry->value = newNode;
+    newEntry->next = table[x];
+    table[x] = newEntry;
+}
+void RPUSH(struct Entry *table[], char key[], char value[])
+{
+    int x = getIndex(key);
+    struct Entry *current = table[x];
+
+    while (current != NULL)
+    {
+        if (strcmp(current->key, key) == 0)
+        {
+            struct ListNode *newNode = malloc(sizeof(struct ListNode));
+
+            if (newNode == NULL)
+            {
+                printf("Memory allocation failed\n");
+                return;
+            }
+
+            strcpy(newNode->value, value);
+            struct ListNode *currentNode=current->value;
+            while(currentNode->next!=NULL){
+                currentNode=currentNode->next;
+            }
+            newNode->next=NULL;
+            currentNode->next = newNode;
+            return;
+        }
+
+        current = current->next;
+    }
+    struct Entry *newEntry = malloc(sizeof(struct Entry));
+
+    if (newEntry == NULL)
+    {
+        printf("Memory allocation failed\n");
+        return;
+    }
+
+    strcpy(newEntry->key, key);
+    struct ListNode *newNode = malloc(sizeof(struct ListNode));
+
+    if (newNode == NULL)
+    {
+        printf("Memory allocation failed\n");
+        free(newEntry);
+        return;
+    }
+
+    strcpy(newNode->value, value);
+    newNode->next = NULL;
+    newEntry->value = newNode;
+    newEntry->next = table[x];
+    table[x] = newEntry;
+}
+int main(){
+    char input[100];
+    struct Entry *table[TABLE_SIZE] = {NULL};
+    while(1){
+        printf("> ");
+        fgets(input,sizeof(input),stdin);
+        if(strcmp(input,"exit\n")==0){
+            return 0;
+        }
+        char *arr[10];
+        int count = 0;
+        char *token=strtok(input," \t\n");
+        while(token!=NULL){
+            arr[count]=token;
+            count++;
+            token=strtok(NULL," \t\n");
+        }
+        if(count == 0)
+            continue;
+
+        if(strcmp(arr[0], "SET") == 0)
+        {
+            if(count != 3)
+            {
+                printf("Usage: SET key value\n");
+                continue;
+            }
+            insertEntry(table, arr[1], arr[2]);
+        }
+        else if(strcmp(arr[0], "GET") == 0)
+        {
+            if(count != 2)
+            {
+                printf("Usage: GET key\n");
+                continue;
+            }
+            getEntry(table, arr[1]);
+        }
+        else if(strcmp(arr[0], "DEL") == 0)
+        {
+            if(count != 2)
+            {
+                printf("Usage: DEL key\n");
+                continue;
+            }
+
+            deleteEntry(table, arr[1]);
+        }
+        else
+        {
+            printf("Unknown command\n");
+        }
+    }
+    return 0;
+
 }
 // void SET(struct KeyValue Database[],char key[],char value[],int *idx){
 //     int found=-1;
@@ -137,19 +299,10 @@ void deleteEntry(struct Entry *table[], char key[]){
 //     }
 //     return;
 // }
-int main(){
-    struct Entry *table[TABLE_SIZE] = {NULL};
-
-    insertEntry(table, "rajat", "367");
-    insertEntry(table, "hello", "69");
-    int index = getIndex("rajat");
-    getEntry(table,"hello");
-    deleteEntry(table,"hello");
-    getEntry(table,"hello");
-    // printf("Key: %s\n", table[index]->key);
-    // printf("Value: %s\n", table[index]->value);
-
-    return 0;
+// *****************************************************************
+// printf("Key: %s\n", table[index]->key);
+// printf("Value: %s\n", table[index]->value);
+// *****************************************************************
     // // struct KeyValue Database[100];
     // int idx=0;
     // SET(Database, "name", "Sansar", &idx);
@@ -159,4 +312,9 @@ int main(){
     // GET(Database,"shivansh",&idx);
     // DEL(Database,"shivansh",&idx);
     // GET(Database,"shivansh",&idx);
-}
+    // insertEntry(table, "rajat", "367");
+    // insertEntry(table, "hello", "69");
+    // int index = getIndex("rajat");
+    // getEntry(table,"hello");
+    // deleteEntry(table,"hello");
+    // getEntry(table,"hello");
