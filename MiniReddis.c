@@ -6,9 +6,20 @@ struct ListNode {
     char value[100];
     struct ListNode *next;
 };
+struct SetNode {
+    char value[100];
+    struct SetNode *next;
+};
+enum DataType {
+    TYPE_STRING,
+    TYPE_LIST,
+    TYPE_SET,
+    TYPE_HASH
+};
 struct Entry {
     char key[50];
-    struct ListNode *value;
+    enum DataType type;
+    void *value;
     struct Entry *next;
 };
 unsigned long hashFunction(char key[])
@@ -26,75 +37,101 @@ int getIndex(char key[])
     unsigned long hash=hashFunction(key);
     return hash %TABLE_SIZE;
 }
-// ********************************* set,get,del command based on old structure*********************
-// void insertEntry(struct Entry *table[], char key[], char value[])
-// {
-//     int x = getIndex(key);
-//     struct Entry *current = table[x];
-//     while(current!=NULL){
-//         if(strcmp(current->key,key)==0){
-//             strcpy(current->value,value);
-//             return;
-//         }
-//         current=current->next;
-//     }
-//     struct Entry *newEntry = malloc(sizeof(struct Entry));
+// **********************************************SET***********************************************
+void insertEntry(struct Entry *table[], char key[], char value[])
+{
+    int x = getIndex(key);
+    struct Entry *current = table[x];
+    while(current!=NULL){
+        if(strcmp(current->key,key)==0){
+            if (current->type != TYPE_STRING)
+            {
+                printf("Wrong data type\n");
+                return;
+            }
+            strcpy((char *)current->value,value);
+            return;
+        }
+        current=current->next;
+    }
+    struct Entry *newEntry = malloc(sizeof(struct Entry));
 
-//     if (newEntry == NULL) {
-//         printf("Memory allocation failed\n");
-//         return;
-//     }
+    if (newEntry == NULL) {
+        printf("Memory allocation failed\n");
+        return;
+    }
 
-//     strcpy(newEntry->key, key);
-//     strcpy(newEntry->value, value);
+    strcpy(newEntry->key, key);
+    newEntry->value=malloc(strlen(value)+1);
+    if (newEntry->value == NULL)
+    {
+        printf("Memory allocation failed\n");
+        free(newEntry);
+        return;
+    }
+    strcpy((char *)newEntry->value, value);
+    newEntry->type=TYPE_STRING;
+    newEntry->next = table[x];
 
-//     newEntry->next = table[x];
-
-//     table[x] = newEntry;
-// }
-// void getEntry(struct Entry *table[], char key[])
-// {
-//     int x=getIndex(key);
-//     struct Entry *current = table[x];
-//     while(current!=NULL){
-//         if(strcmp(current->key,key)==0){
-//             printf("key: %s,value: %s\n",current->key,current->value);
-//             return;
-//         }
-//         current=current->next;
-//     }
-//     printf("Entry not found\n");
-// }
-// void deleteEntry(struct Entry *table[], char key[]){
-//     int x=getIndex(key);
-//     struct Entry *current = table[x];
-//     if(current==NULL){
-//         printf("Entry not found\n");
-//         return;
-//     }
-//     if(current->next==NULL){
-//          if(strcmp(current->key,key)==0){
-//             table[x]=current->next;
-//             current->next=NULL;
-//             free(current);
-//             return;
-//          }
-//          printf("Entry not found\n");
-//          return;
-//     }
-//     while(current->next!=NULL){
-//         if(strcmp(current->next->key,key)==0){
-//             struct Entry *temp=current->next;
-//             current->next=current->next->next;
-//             temp->next=NULL;
-//             free(temp);
-//             return;
-//         }
-//         current=current->next;
-//     }
-//     printf("Entry not found\n");
-// }
-// ****************************************************************************************************
+    table[x] = newEntry;
+}
+// **********************************************GET***********************************************
+void getEntry(struct Entry *table[], char key[])
+{
+    int x=getIndex(key);
+    struct Entry *current = table[x];
+    while(current!=NULL){
+        if(strcmp(current->key,key)==0){
+            if (current->type != TYPE_STRING)
+            {
+                printf("Wrong data type\n");
+                return;
+            }
+            printf("key: %s,value: %s\n",current->key,(char *)current->value);
+            return;
+        }
+        current=current->next;
+    }
+    printf("Entry not found\n");
+}
+// **********************************************DEL***********************************************
+void deleteEntry(struct Entry *table[], char key[]){
+    int x=getIndex(key);
+    struct Entry *current = table[x];
+    if(current==NULL){
+        printf("Entry not found\n");
+        return;
+    }
+    if(current->next==NULL){
+         if(strcmp(current->key,key)==0){
+            if (current->type != TYPE_STRING)
+            {
+                printf("Wrong data type\n");
+                return;
+            }
+            table[x]=current->next;
+            current->next=NULL;
+            free(current->value);
+            free(current);
+            return;
+         }
+         printf("Entry not found\n");
+         return;
+    }
+    while(current->next!=NULL){
+        if(strcmp(current->next->key,key)==0){
+            struct Entry *temp=current->next;
+            current->next=current->next->next;
+            temp->next=NULL;
+            free(temp->value);
+            free(temp);
+            return;
+        }
+        current=current->next;
+    }
+    printf("Entry not found\n");
+}
+// ******************************************LPUSH***************************************************
 void LPUSH(struct Entry *table[], char key[], char value[])
 {
     int x = getIndex(key);
@@ -104,6 +141,11 @@ void LPUSH(struct Entry *table[], char key[], char value[])
     {
         if (strcmp(current->key, key) == 0)
         {
+            if (current->type != TYPE_LIST)
+            {
+                printf("Wrong data type\n");
+                return;
+            }
             struct ListNode *newNode = malloc(sizeof(struct ListNode));
 
             if (newNode == NULL)
@@ -113,7 +155,9 @@ void LPUSH(struct Entry *table[], char key[], char value[])
             }
 
             strcpy(newNode->value, value);
-            newNode->next = current->value;
+
+            struct ListNode *currentNode =(struct ListNode *)current->value;
+            newNode->next = currentNode;
             current->value = newNode;
 
             return;
@@ -141,10 +185,12 @@ void LPUSH(struct Entry *table[], char key[], char value[])
 
     strcpy(newNode->value, value);
     newNode->next = NULL;
+    newEntry->type = TYPE_LIST;
     newEntry->value = newNode;
     newEntry->next = table[x];
     table[x] = newEntry;
 }
+// **********************************************RPUSH***********************************************
 void RPUSH(struct Entry *table[], char key[], char value[])
 {
     int x = getIndex(key);
@@ -154,6 +200,11 @@ void RPUSH(struct Entry *table[], char key[], char value[])
     {
         if (strcmp(current->key, key) == 0)
         {
+            if (current->type != TYPE_LIST)
+            {
+                printf("Wrong data type\n");
+                return;
+            }
             struct ListNode *newNode = malloc(sizeof(struct ListNode));
 
             if (newNode == NULL)
@@ -163,7 +214,7 @@ void RPUSH(struct Entry *table[], char key[], char value[])
             }
 
             strcpy(newNode->value, value);
-            struct ListNode *currentNode=current->value;
+            struct ListNode *currentNode=(struct ListNode *)current->value;
             while(currentNode->next!=NULL){
                 currentNode=currentNode->next;
             }
@@ -194,10 +245,12 @@ void RPUSH(struct Entry *table[], char key[], char value[])
 
     strcpy(newNode->value, value);
     newNode->next = NULL;
+    newEntry->type = TYPE_LIST;
     newEntry->value = newNode;
     newEntry->next = table[x];
     table[x] = newEntry;
 }
+// **********************************************LPOP***********************************************
 void LPOP(struct Entry *table[], char key[])
 {
     int x = getIndex(key);
@@ -207,7 +260,12 @@ void LPOP(struct Entry *table[], char key[])
     {
         if (strcmp(current->key, key) == 0)
         {
-            struct ListNode * currentNode=current->value;
+            if (current->type != TYPE_LIST)
+            {
+                printf("Wrong data type\n");
+                return;
+            }
+            struct ListNode * currentNode=(struct ListNode *)current->value;
             if(currentNode->next==NULL){
                 if(prev==NULL){
                     table[x]=current->next;
@@ -231,6 +289,7 @@ void LPOP(struct Entry *table[], char key[])
     printf("Entry not found");
     return;
 }
+// **********************************************RPOP***********************************************
 void RPOP(struct Entry *table[], char key[])
 {
     int x = getIndex(key);
@@ -240,7 +299,12 @@ void RPOP(struct Entry *table[], char key[])
     {
         if (strcmp(current->key, key) == 0)
         {
-            struct ListNode * currentNode=current->value;
+            if (current->type != TYPE_LIST)
+            {
+                printf("Wrong data type\n");
+                return;
+            }
+            struct ListNode * currentNode=(struct ListNode *)current->value;
             if(currentNode->next==NULL){
                 if(prev==NULL){
                     table[x]=current->next;
@@ -267,7 +331,7 @@ void RPOP(struct Entry *table[], char key[])
     printf("Entry not found");
     return;
 }
-
+// **********************************************LRANGE***********************************************
 void LRANGE(struct Entry *table[], char key[])
 {
     int x = getIndex(key);
@@ -277,14 +341,19 @@ void LRANGE(struct Entry *table[], char key[])
     {
         if (strcmp(current->key, key) == 0)
         {
-            struct ListNode *currentNode = current->value;
+            if (current->type != TYPE_LIST)
+            {
+                printf("Wrong data type\n");
+                return;
+            }
+            struct ListNode *currentNode = (struct ListNode *)current->value;
 
             while (currentNode != NULL)
             {
                 printf("%s->", currentNode->value);
                 currentNode = currentNode->next;
             }
-            printf("null\n")
+            printf("null\n");
 
             return;
         }
@@ -293,6 +362,187 @@ void LRANGE(struct Entry *table[], char key[])
     }
 
     printf("Entry not found\n");
+}
+// **********************************************SADD***********************************************
+void SADD(struct Entry *table[], char key[], char value[]){
+    int x = getIndex(key);
+    struct Entry *current = table[x];
+    while (current != NULL)
+    {
+        if (strcmp(current->key, key) == 0)
+        {
+            if (current->type != TYPE_SET)
+            {
+                printf("Wrong data type\n");
+                return;
+            }
+            struct SetNode *temp =(struct SetNode *)current->value;
+            while(temp!=NULL){
+                if(strcmp(temp->value,value)==0){
+                    printf("Duplicate Value\n");
+                    return;
+                }
+                temp=temp->next;
+            }
+            struct SetNode *newNode = malloc(sizeof(struct SetNode));
+
+            if (newNode == NULL)
+            {
+                printf("Memory allocation failed\n");
+                return;
+            }
+            strcpy(newNode->value, value);
+
+            struct SetNode *currentNode =(struct SetNode *)current->value;
+            newNode->next = currentNode;
+            current->value = newNode;
+
+            return;
+        }
+
+        current = current->next;
+    }
+    struct Entry *newEntry = malloc(sizeof(struct Entry));
+
+    if (newEntry == NULL)
+    {
+        printf("Memory allocation failed\n");
+        return;
+    }
+
+    strcpy(newEntry->key, key);
+    struct SetNode *newNode = malloc(sizeof(struct SetNode));
+
+    if (newNode == NULL)
+    {
+        printf("Memory allocation failed\n");
+        free(newEntry);
+        return;
+    }
+
+    strcpy(newNode->value, value);
+    newNode->next = NULL;
+    newEntry->type = TYPE_SET;
+    newEntry->value = newNode;
+    newEntry->next = table[x];
+    table[x] = newEntry;
+}
+// **********************************************SREM***********************************************
+void SREM(struct Entry *table[], char key[],char value[])
+{
+    int x = getIndex(key);
+    struct Entry *current = table[x];
+    struct Entry *prev = NULL;
+    while (current != NULL)
+    {
+        if (strcmp(current->key, key) == 0)
+        {
+            if (current->type != TYPE_SET)
+            {
+                printf("Wrong data type\n");
+                return;
+            }
+            struct SetNode * currentNode=(struct SetNode *)current->value;
+            struct SetNode * prevNode=NULL;
+            while(currentNode!=NULL){
+                if(strcmp(currentNode->value,value)==0){
+                    break;
+                }
+                prevNode=currentNode;
+                currentNode=currentNode->next;
+            }
+            if(currentNode==NULL){
+                return;
+            }
+            if(currentNode->next==NULL){
+                if(prevNode==NULL){
+                    if(prev==NULL){
+                        table[x]=current->next;
+                        current->next=NULL;
+                        free(currentNode);
+                        free(current);
+                        return;
+                    }
+                    prev->next=current->next;
+                    current->next=NULL;
+                    free(currentNode);
+                    free(current);
+                    return;
+                }
+            }
+            if(prevNode==NULL){
+                current->value=currentNode->next;
+                currentNode->next=NULL;
+                free(currentNode);
+                return;
+            }
+            prevNode->next=currentNode->next;
+            currentNode->next=NULL;
+            free(currentNode);
+            return;
+        }
+        prev=current;
+        current = current->next;
+    }
+    printf("Entry not found");
+    return;
+}
+// **********************************************SISMEMBER***********************************************
+void SISMEMBER(struct Entry *table[], char key[],char value[])
+{
+    int x = getIndex(key);
+    struct Entry *current = table[x];
+    while (current != NULL)
+    {
+        if (strcmp(current->key, key) == 0)
+        {
+            if (current->type != TYPE_SET)
+            {
+                printf("Wrong data type\n");
+                return;
+            }
+            struct SetNode * currentNode=(struct SetNode *)current->value;
+            while(currentNode!=NULL){
+                if(strcmp(currentNode->value,value)==0){
+                    printf("value Exists");
+                    return;
+                }
+                currentNode=currentNode->next;
+            }
+            printf("Value Does Not Exists");
+            return;
+        }
+        current = current->next;
+    }
+    printf("Entry not found");
+    return;
+}
+// **********************************************SMEMBERS***********************************************
+void SMEMBERS(struct Entry *table[], char key[])
+{
+    int x = getIndex(key);
+    struct Entry *current = table[x];
+    while (current != NULL)
+    {
+        if (strcmp(current->key, key) == 0)
+        {
+            if (current->type != TYPE_SET)
+            {
+                printf("Wrong data type\n");
+                return;
+            }
+            struct SetNode * currentNode=(struct SetNode *)current->value;
+            while(currentNode!=NULL){
+                printf("%s->",currentNode->value);
+                currentNode=currentNode->next;
+            }
+            printf("null\n");
+            return;
+        }
+        current = current->next;
+    }
+    printf("Entry not found");
+    return;
 }
 int main()
 {
@@ -329,38 +579,38 @@ int main()
             continue;
         }
 
-        // if (strcmp(arr[0], "SET") == 0)
-        // {
-        //     if (count != 3)
-        //     {
-        //         printf("Usage: SET key value\n");
-        //         continue;
-        //     }
+        if (strcmp(arr[0], "SET") == 0)
+        {
+            if (count != 3)
+            {
+                printf("Usage: SET key value\n");
+                continue;
+            }
 
-        //     insertEntry(table, arr[1], arr[2]);
-        // }
+            insertEntry(table, arr[1], arr[2]);
+        }
 
-        // else if (strcmp(arr[0], "GET") == 0)
-        // {
-        //     if (count != 2)
-        //     {
-        //         printf("Usage: GET key\n");
-        //         continue;
-        //     }
+        else if (strcmp(arr[0], "GET") == 0)
+        {
+            if (count != 2)
+            {
+                printf("Usage: GET key\n");
+                continue;
+            }
 
-        //     getEntry(table, arr[1]);
-        // }
+            getEntry(table, arr[1]);
+        }
 
-        // else if (strcmp(arr[0], "DEL") == 0)
-        // {
-        //     if (count != 2)
-        //     {
-        //         printf("Usage: DEL key\n");
-        //         continue;
-        //     }
+        else if (strcmp(arr[0], "DEL") == 0)
+        {
+            if (count != 2)
+            {
+                printf("Usage: DEL key\n");
+                continue;
+            }
 
-        //     deleteEntry(table, arr[1]);
-        // }
+            deleteEntry(table, arr[1]);
+        }
 // **********************************************LPUSH***********************************************
         else if (strcmp(arr[0], "LPUSH") == 0)
         {
@@ -416,7 +666,48 @@ int main()
 
             LRANGE(table, arr[1]);
         }
+// ********************************************SADD********************************************
+        else if (strcmp(arr[0], "SADD") == 0)
+        {
+            if (count != 3)
+            {
+                printf("Usage: SADD key value\n");
+                continue;
+            }
+            SADD(table, arr[1], arr[2]);
+        }
+// ********************************************SREM********************************************
+        else if (strcmp(arr[0], "SREM") == 0)
+        {
+            if (count != 3)
+            {
+                printf("Usage: SREM key value\n");
+                continue;
+            }
+            SREM(table, arr[1], arr[2]);
+        }
+// ********************************************SISMEMBER********************************************
+        else if (strcmp(arr[0], "SISMEMBER") == 0)
+        {
+            if (count != 3)
+            {
+                printf("Usage: SISMEMBER key value\n");
+                continue;
+            }
+            SISMEMBER(table, arr[1], arr[2]);
+        }
+// ********************************************SMEMBERS********************************************
+        else if (strcmp(arr[0], "SMEMBERS") == 0 )
+        {
+            if (count != 2)
+            {
+                printf("Usage: SMEMBERS key\n");
+                continue;
+            }
 
+            SMEMBERS(table, arr[1]);
+        }       
+// ********************************************DEFAULT********************************************
         else
         {
             printf("Unknown command\n");
@@ -425,69 +716,3 @@ int main()
 
     return 0;
 }
-// void SET(struct KeyValue Database[],char key[],char value[],int *idx){
-//     int found=-1;
-//     for(int i=0;i<*idx;i++){
-//         if(strcmp(Database[i].key, key) == 0){
-//             found=i;
-//             strcpy(Database[i].value,value);
-//             break;
-//         }
-//     }
-//     if(found==-1){
-//         strcpy(Database[*idx].key,key);
-//         strcpy(Database[*idx].value,value);
-//         (*idx)++;
-//     }
-//     return;
-// }
-// void GET(struct KeyValue Database[],char key[],int *idx){
-//     int found=-1;
-//     for(int i=0;i<*idx;i++){
-//         if(strcmp(Database[i].key, key) == 0){
-//             found=i;
-//             printf("Key: %s, Value: %s, idx: %d\n",Database[i].key,Database[i].value,i);
-//             break;
-//         }
-//     }
-//     if(found==-1){
-//         printf("Key not found");
-//     }
-//     return;
-// }
-// void DEL(struct KeyValue Database[],char key[],int *idx){
-//     int found=-1;
-//     for(int i=0;i<*idx;i++){
-//         if(strcmp(Database[i].key, key) == 0){
-//             found=i;
-//             for(int j=i;j<*idx-1;j++){
-//                 Database[j]=Database[j+1];
-//             }
-//             (*idx)--;
-//             break;
-//         }
-//     }
-//     if(found==-1){
-//         printf("Key not found");
-//     }
-//     return;
-// }
-// *****************************************************************
-// printf("Key: %s\n", table[index]->key);
-// printf("Value: %s\n", table[index]->value);
-// *****************************************************************
-    // // struct KeyValue Database[100];
-    // int idx=0;
-    // SET(Database, "name", "Sansar", &idx);
-    // SET(Database,"age","34",&idx);
-    // SET(Database,"shivansh","good boy",&idx);
-    // SET(Database,"age","45",&idx);
-    // GET(Database,"shivansh",&idx);
-    // DEL(Database,"shivansh",&idx);
-    // GET(Database,"shivansh",&idx);
-    // insertEntry(table, "rajat", "367");
-    // insertEntry(table, "hello", "69");
-    // int index = getIndex("rajat");
-    // getEntry(table,"hello");
-    // deleteEntry(table,"hello");
-    // getEntry(table,"hello");
