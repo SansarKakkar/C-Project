@@ -10,6 +10,11 @@ struct SetNode {
     char value[100];
     struct SetNode *next;
 };
+struct HashNode{
+    char field[50];
+    char value[100];
+    struct HashNode *next;
+};
 enum DataType {
     TYPE_STRING,
     TYPE_LIST,
@@ -544,6 +549,164 @@ void SMEMBERS(struct Entry *table[], char key[])
     printf("Entry not found");
     return;
 }
+// ********************************************HSET*******************************************
+void HSET(struct Entry *table[], char key[],char field[],char value[]){
+    int x=getIndex(key);
+    struct Entry *current=table[x];
+    while(current!=NULL){
+        if(strcmp(current->key,key)==0){
+            if (current->type != TYPE_HASH)
+            {
+                printf("Wrong data type\n");
+                return;
+            }
+            struct HashNode *currentNode=(struct HashNode *)current->value;
+            struct HashNode *temp=currentNode;
+            while(temp!=NULL){
+                if(strcmp(temp->field,field)==0){
+                    strcpy(temp->value,value);
+                    return;
+                }
+                temp=temp->next;
+            }
+            struct HashNode * newNode=malloc(sizeof(struct HashNode));
+            if (newNode == NULL)
+            {
+                printf("Memory allocation failed\n");
+                return;
+            }
+            strcpy(newNode->field,field);
+            strcpy(newNode->value,value);
+            newNode->next=currentNode;
+            current->value=newNode;
+            return;
+        }
+        current=current->next;
+    }
+    struct Entry *newEntry=malloc(sizeof(struct Entry));
+    struct HashNode *newNode=malloc(sizeof(struct HashNode));
+    strcpy(newNode->field,field);
+    strcpy(newNode->value,value);
+    newNode->next = NULL;
+    newEntry->next=table[x];
+    strcpy(newEntry->key,key);
+    newEntry->type=TYPE_HASH;
+    newEntry->value=newNode;
+    table[x]=newEntry;
+    return;
+
+}
+// ********************************************HGET********************************************
+void HGET(struct Entry *table[], char key[],char field[]){
+    int x=getIndex(key);
+    struct Entry *current=table[x];
+    while(current!=NULL){
+        if(strcmp(current->key,key)==0){
+            if (current->type != TYPE_HASH)
+            {
+                printf("Wrong data type\n");
+                return;
+            }
+            struct HashNode *currentNode=(struct HashNode *)current->value;
+            while(currentNode!=NULL){
+                if(strcmp(currentNode->field,field)==0){
+                    printf("value: %s\n",currentNode->value);
+                    return;
+                }
+                currentNode=currentNode->next;
+            }
+            printf("feild not found\n");
+            return;
+        }
+        current=current->next;
+    }
+    printf("entry not found");
+    return;
+}
+// ********************************************HDEL********************************************
+void HDEL(struct Entry *table[], char key[], char field[]){
+    int x = getIndex(key);
+    struct Entry *current = table[x];
+    struct Entry *prev = NULL;
+    while (current != NULL)
+    {
+        if (strcmp(current->key, key) == 0)
+        {
+            if (current->type != TYPE_HASH)
+            {
+                printf("Wrong data type\n");
+                return;
+            }
+            struct HashNode *currentNode =(struct HashNode *)current->value;
+            struct HashNode *prevNode = NULL;
+            while (currentNode != NULL)
+            {
+                if (strcmp(currentNode->field, field) == 0)
+                {
+                    break;
+                }
+                prevNode = currentNode;
+                currentNode = currentNode->next;
+            }
+            if (currentNode == NULL)
+            {
+                printf("Field not found\n");
+                return;
+            }
+            if (currentNode->next == NULL && prevNode == NULL)
+            {
+                if (prev == NULL)
+                {
+                    table[x] = current->next;
+                }
+                else
+                {
+                    prev->next = current->next;
+                }
+                free(currentNode);
+                free(current);
+                return;
+            }
+            if (prevNode == NULL)
+            {
+                current->value = currentNode->next;
+                free(currentNode);
+                return;
+            }
+            prevNode->next = currentNode->next;
+            free(currentNode);
+            return;
+        }
+        prev = current;
+        current = current->next;
+    }
+    printf("Entry not found\n");
+}
+// ********************************************HGETALL********************************************
+void HGETALL(struct Entry *table[], char key[]){
+    int x = getIndex(key);
+    struct Entry *current = table[x];
+    while (current != NULL)
+    {
+        if (strcmp(current->key, key) == 0)
+        {
+            if (current->type != TYPE_HASH)
+            {
+                printf("Wrong data type\n");
+                return;
+            }
+            struct HashNode *currentNode =(struct HashNode *)current->value;
+            while (currentNode != NULL)
+            {
+                printf("%s : %s\n",currentNode->field,currentNode->value);
+                currentNode = currentNode->next;
+            }
+            return;
+        }
+        current = current->next;
+    }
+    printf("Entry not found\n");
+}
 int main()
 {
     char input[100];
@@ -707,6 +870,46 @@ int main()
 
             SMEMBERS(table, arr[1]);
         }       
+// ********************************************HSET********************************************
+        else if (strcmp(arr[0], "HSET") == 0)
+        {
+            if (count != 4)
+            {
+                printf("Usage: HSET key\n");
+                continue;
+            }
+            HSET(table, arr[1], arr[2], arr[3]);
+        }
+// ********************************************HGET********************************************
+        else if (strcmp(arr[0], "HGET") == 0 )
+        {
+            if (count != 3)
+            {
+                printf("Usage: HGET key\n");
+                continue;
+            }
+            HGET(table, arr[1], arr[2]);
+        }
+// ********************************************HDEL********************************************
+        else if (strcmp(arr[0], "HDEL") == 0 )
+        {
+            if (count != 3)
+            {
+                printf("Usage: HDEL key\n");
+                continue;
+            }
+            HDEL(table, arr[1], arr[2]);
+        }
+// ********************************************HGETALL********************************************
+        else if (strcmp(arr[0], "HGETALL") == 0 )
+        {
+            if (count != 2)
+            {
+                printf("Usage: HGETALL key\n");
+                continue;
+            }
+            HGETALL(table, arr[1]);
+        }
 // ********************************************DEFAULT********************************************
         else
         {
