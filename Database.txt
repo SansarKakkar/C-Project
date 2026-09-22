@@ -1,0 +1,16 @@
+
+SET name Sansar
+SET name Kakkar
+SET city Delhi
+DEL city
+SET name Sansar
+LPUSH skills C
+LPUSH skills Java
+RPUSH skills Python
+SADD languages C
+SADD languages Java
+SADD languages Python
+HSET user name Sansar
+HSET user age 21
+HSET user city Delhi
+SET age 49
