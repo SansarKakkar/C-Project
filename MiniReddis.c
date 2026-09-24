@@ -6,27 +6,38 @@ struct ListNode {
     char value[100];
     struct ListNode *next;
 };
+
 struct SetNode {
     char value[100];
     struct SetNode *next;
 };
+
 struct HashNode{
     char field[50];
     char value[100];
     struct HashNode *next;
 };
+
 enum DataType {
     TYPE_STRING,
     TYPE_LIST,
     TYPE_SET,
     TYPE_HASH
 };
+
 struct Entry {
     char key[50];
     enum DataType type;
     void *value;
     struct Entry *next;
 };
+
+struct Transaction
+{
+    int active;
+    struct Entry *snapshot[TABLE_SIZE];
+};
+
 unsigned long hashFunction(char key[])
 {
     unsigned long hash = 0;
@@ -40,32 +51,35 @@ unsigned long hashFunction(char key[])
 int getIndex(char key[])
 {
     unsigned long hash=hashFunction(key);
-    return hash %TABLE_SIZE;
+    return hash % TABLE_SIZE;
 }
 // **********************************************SET***********************************************
 int insertEntry(struct Entry *table[], char key[], char value[])
 {
     int x = getIndex(key);
     struct Entry *current = table[x];
+
     while(current!=NULL){
-        if (strcmp(current->key, key) == 0)
+        if (strcmp(current -> key, key) == 0)
         {
-            if (current->type != TYPE_STRING)
+            if (current -> type != TYPE_STRING)
             {
                 printf("Wrong data type\n");
                 return -1;
             }
-            char *temp = realloc(current->value, strlen(value) + 1);
+
+            char *temp = realloc(current -> value, strlen(value) + 1);
             if (temp == NULL)
             {
                 printf("Memory allocation failed\n");
                 return -1;
             }
-            current->value = temp;
+
+            current -> value = temp;
             strcpy((char *)current->value, value);
             return 1;
         }
-        current=current->next;
+        current = current -> next;
     }
     struct Entry *newEntry = malloc(sizeof(struct Entry));
 
@@ -74,69 +88,162 @@ int insertEntry(struct Entry *table[], char key[], char value[])
         return -1;
     }
 
-    strcpy(newEntry->key, key);
-    newEntry->value=malloc(strlen(value)+1);
-    if (newEntry->value == NULL)
+    strcpy(newEntry -> key, key);
+    newEntry -> value=malloc(strlen(value)+1);
+
+    if (newEntry -> value == NULL)
     {
         printf("Memory allocation failed\n");
         free(newEntry);
         return -1;
     }
     strcpy((char *)newEntry->value, value);
-    newEntry->type=TYPE_STRING;
-    newEntry->next = table[x];
+    newEntry -> type=TYPE_STRING;
+    newEntry -> next = table[x];
     table[x] = newEntry;
     return 1;
+}
+
+void freeEntry(struct Entry *entry)
+{
+    if (entry == NULL)
+    {
+        return;
+    }
+
+    if (entry -> type == TYPE_STRING)
+    {
+        free(entry -> value);
+    }
+
+    else if (entry -> type == TYPE_LIST)
+    {
+        struct ListNode *current =(struct ListNode *)entry->value;
+
+        while (current != NULL)
+        {
+            struct ListNode *next = current->next;
+            free(current);
+            current = next;
+        }
+    }
+
+    else if (entry -> type == TYPE_SET)
+    {
+        struct SetNode *current =(struct SetNode *)entry->value;
+
+        while (current != NULL)
+        {
+            struct SetNode *next = current->next;
+            free(current);
+            current = next;
+        }
+    }
+
+    else if (entry -> type == TYPE_HASH)
+    {
+        struct HashNode *current =(struct HashNode *)entry->value;
+
+        while (current != NULL)
+        {
+            struct HashNode *next = current->next;
+            free(current);
+            current = next;
+        }
+    }
+
+    free(entry);
+}
+void freeTable(struct Entry *table[])
+{
+    for (int i = 0; i < TABLE_SIZE; i++)
+    {
+        struct Entry *current = table[i];
+
+        while (current != NULL)
+        {
+            struct Entry *next = current->next;
+
+            freeEntry(current);
+
+            current = next;
+        }
+
+        table[i] = NULL;
+    }
 }
 // **********************************************GET***********************************************
 void getEntry(struct Entry *table[], char key[])
 {
     int x=getIndex(key);
     struct Entry *current = table[x];
-    while(current!=NULL){
-        if(strcmp(current->key,key)==0){
-            if (current->type != TYPE_STRING)
+
+    while(current != NULL){
+
+        if(strcmp(current -> key,key)==0){
+
+            if (current -> type != TYPE_STRING)
             {
                 printf("Wrong data type\n");
                 return;
             }
-            printf("key: %s,value: %s\n",current->key,(char *)current->value);
+            printf("key: %s,value: %s\n",current -> key,(char *)current -> value);
             return;
         }
-        current=current->next;
+        current = current -> next;
     }
     printf("Entry not found\n");
+}
+void COMMIT(struct Transaction *transaction)
+{
+    if (!transaction -> active)
+    {
+        printf("No active transaction\n");
+        return;
+    }
+
+    freeTable(transaction -> snapshot);
+
+    transaction -> active = 0;
+
+    printf("Transaction committed\n");
 }
 // **********************************************DEL***********************************************
 int deleteEntry(struct Entry *table[], char key[]){
     int x=getIndex(key);
     struct Entry *current = table[x];
-    if(current==NULL){
+
+    if(current == NULL){
         printf("Entry not found\n");
         return -1;
     }
-    if(current->next==NULL){
-         if(strcmp(current->key,key)==0){
-            if (current->type != TYPE_STRING)
+
+    if(current -> next == NULL){
+
+         if(strcmp(current -> key,key)==0){
+
+            if (current -> type != TYPE_STRING)
             {
                 printf("Wrong data type\n");
                 return -1;
             }
-            table[x]=current->next;
-            current->next=NULL;
-            free(current->value);
+            table[x] = current -> next;
+            current -> next = NULL;
+            free(current -> value);
             free(current);
             return 1;
          }
          printf("Entry not found\n");
          return -1;
     }
+
     while(current->next!=NULL){
-        if(strcmp(current->next->key,key)==0){
-            struct Entry *temp=current->next;
-            current->next=current->next->next;
-            temp->next=NULL;
-            free(temp->value);
+
+        if(strcmp(current -> next -> key,key)==0){
+            struct Entry *temp=current -> next;
+            current -> next=current -> next -> next;
+            temp -> next = NULL;
+            free(temp -> value);
             free(temp);
             return 1;
         }
@@ -153,9 +260,9 @@ int LPUSH(struct Entry *table[], char key[], char value[])
 
     while (current != NULL)
     {
-        if (strcmp(current->key, key) == 0)
+        if (strcmp(current -> key, key) == 0)
         {
-            if (current->type != TYPE_LIST)
+            if (current -> type != TYPE_LIST)
             {
                 printf("Wrong data type\n");
                 return -1;
@@ -171,10 +278,8 @@ int LPUSH(struct Entry *table[], char key[], char value[])
             struct ListNode *currentNode =(struct ListNode *)current->value;
             newNode->next = currentNode;
             current->value = newNode;
-
             return 1;
         }
-
         current = current->next;
     }
     struct Entry *newEntry = malloc(sizeof(struct Entry));
@@ -195,11 +300,11 @@ int LPUSH(struct Entry *table[], char key[], char value[])
         return -1;
     }
 
-    strcpy(newNode->value, value);
-    newNode->next = NULL;
-    newEntry->type = TYPE_LIST;
-    newEntry->value = newNode;
-    newEntry->next = table[x];
+    strcpy(newNode -> value, value);
+    newNode -> next = NULL;
+    newEntry -> type = TYPE_LIST;
+    newEntry -> value = newNode;
+    newEntry -> next = table[x];
     table[x] = newEntry;
     return 1;
 }
@@ -211,9 +316,9 @@ int RPUSH(struct Entry *table[], char key[], char value[])
 
     while (current != NULL)
     {
-        if (strcmp(current->key, key) == 0)
+        if (strcmp(current -> key, key) == 0)
         {
-            if (current->type != TYPE_LIST)
+            if (current -> type != TYPE_LIST)
             {
                 printf("Wrong data type\n");
                 return -1;
@@ -226,17 +331,17 @@ int RPUSH(struct Entry *table[], char key[], char value[])
                 return -1;
             }
 
-            strcpy(newNode->value, value);
-            struct ListNode *currentNode=(struct ListNode *)current->value;
-            while(currentNode->next!=NULL){
-                currentNode=currentNode->next;
+            strcpy(newNode -> value, value);
+            struct ListNode *currentNode=(struct ListNode *)current -> value;
+            while(currentNode -> next!= NULL){
+                currentNode = currentNode->next;
             }
-            newNode->next=NULL;
-            currentNode->next = newNode;
+            newNode -> next= NULL;
+            currentNode -> next = newNode;
             return 1;
         }
 
-        current = current->next;
+        current = current -> next;
     }
     struct Entry *newEntry = malloc(sizeof(struct Entry));
 
@@ -246,7 +351,7 @@ int RPUSH(struct Entry *table[], char key[], char value[])
         return -1;
     }
 
-    strcpy(newEntry->key, key);
+    strcpy(newEntry -> key, key);
     struct ListNode *newNode = malloc(sizeof(struct ListNode));
 
     if (newNode == NULL)
@@ -256,11 +361,11 @@ int RPUSH(struct Entry *table[], char key[], char value[])
         return -1;
     }
 
-    strcpy(newNode->value, value);
-    newNode->next = NULL;
-    newEntry->type = TYPE_LIST;
-    newEntry->value = newNode;
-    newEntry->next = table[x];
+    strcpy(newNode -> value, value);
+    newNode -> next = NULL;
+    newEntry -> type = TYPE_LIST;
+    newEntry -> value = newNode;
+    newEntry -> next = table[x];
     table[x] = newEntry;
     return 1;
 }
@@ -272,32 +377,33 @@ int LPOP(struct Entry *table[], char key[])
     struct Entry *prev = NULL;
     while (current != NULL)
     {
-        if (strcmp(current->key, key) == 0)
+        if (strcmp(current -> key, key) == 0)
         {
-            if (current->type != TYPE_LIST)
+            if (current -> type != TYPE_LIST)
             {
                 printf("Wrong data type\n");
                 return -1;
             }
-            struct ListNode * currentNode=(struct ListNode *)current->value;
-            if(currentNode->next==NULL){
-                if(prev==NULL){
-                    table[x]=current->next;
-                    current->next=NULL;
+            struct ListNode * currentNode = (struct ListNode *)current->value;
+            if(currentNode -> next == NULL){
+
+                if(prev == NULL){
+                    table[x] = current->next;
+                    current -> next = NULL;
                     free(current);
                     return 1;
                 }
-                prev->next=current->next;
-                current->next=NULL;
+                prev -> next = current -> next;
+                current -> next = NULL;
                 free(current);
                 return 1;
             }
-            current->value=currentNode->next;
-            currentNode->next=NULL;
+            current -> value = currentNode -> next;
+            currentNode -> next = NULL;
             free(currentNode);
             return 1;
         }
-        prev=current;
+        prev = current;
         current = current->next;
     }
     printf("Entry not found");
@@ -318,28 +424,30 @@ int RPOP(struct Entry *table[], char key[])
                 printf("Wrong data type\n");
                 return -1;
             }
-            struct ListNode * currentNode=(struct ListNode *)current->value;
-            if(currentNode->next==NULL){
-                if(prev==NULL){
-                    table[x]=current->next;
-                    current->next=NULL;
+            struct ListNode * currentNode = (struct ListNode *)current->value;
+            if(currentNode -> next == NULL){
+
+                if(prev == NULL){
+                    table[x] = current->next;
+                    current -> next = NULL;
                     free(current);
                     return 1;
                 }
-                prev->next=current->next;
-                current->next=NULL;
+                prev -> next = current -> next;
+                current -> next = NULL;
                 free(current);
                 return 1;
             }
-            while(currentNode->next->next!=NULL){
-                currentNode=currentNode->next;
+
+            while(currentNode -> next -> next != NULL){
+                currentNode = currentNode -> next;
             }
-            struct ListNode * temp=currentNode->next;
-            currentNode->next=NULL;
+            struct ListNode * temp = currentNode -> next;
+            currentNode -> next = NULL;
             free(temp);
             return 1;
         }
-        prev=current;
+        prev = current;
         current = current->next;
     }
     printf("Entry not found");
@@ -353,9 +461,9 @@ void LRANGE(struct Entry *table[], char key[])
 
     while (current != NULL)
     {
-        if (strcmp(current->key, key) == 0)
+        if (strcmp(current -> key, key) == 0)
         {
-            if (current->type != TYPE_LIST)
+            if (current -> type != TYPE_LIST)
             {
                 printf("Wrong data type\n");
                 return;
@@ -364,11 +472,10 @@ void LRANGE(struct Entry *table[], char key[])
 
             while (currentNode != NULL)
             {
-                printf("%s->", currentNode->value);
-                currentNode = currentNode->next;
+                printf("%s->", currentNode -> value);
+                currentNode = currentNode -> next;
             }
             printf("null\n");
-
             return;
         }
 
@@ -381,22 +488,23 @@ void LRANGE(struct Entry *table[], char key[])
 int SADD(struct Entry *table[], char key[], char value[]){
     int x = getIndex(key);
     struct Entry *current = table[x];
+
     while (current != NULL)
     {
-        if (strcmp(current->key, key) == 0)
+        if (strcmp(current -> key, key) == 0)
         {
-            if (current->type != TYPE_SET)
+            if (current -> type != TYPE_SET)
             {
                 printf("Wrong data type\n");
                 return -1;
             }
             struct SetNode *temp =(struct SetNode *)current->value;
-            while(temp!=NULL){
-                if(strcmp(temp->value,value)==0){
+            while(temp != NULL){
+                if(strcmp(temp -> value, value)==0){
                     printf("Duplicate Value\n");
                     return -1;
                 }
-                temp=temp->next;
+                temp = temp->next;
             }
             struct SetNode *newNode = malloc(sizeof(struct SetNode));
 
@@ -405,16 +513,16 @@ int SADD(struct Entry *table[], char key[], char value[]){
                 printf("Memory allocation failed\n");
                 return -1;
             }
-            strcpy(newNode->value, value);
+            strcpy(newNode -> value, value);
 
-            struct SetNode *currentNode =(struct SetNode *)current->value;
+            struct SetNode *currentNode = (struct SetNode *)current->value;
             newNode->next = currentNode;
             current->value = newNode;
 
             return 1;
         }
 
-        current = current->next;
+        current = current -> next;
     }
     struct Entry *newEntry = malloc(sizeof(struct Entry));
 
@@ -424,7 +532,7 @@ int SADD(struct Entry *table[], char key[], char value[]){
         return -1;
     }
 
-    strcpy(newEntry->key, key);
+    strcpy(newEntry -> key, key);
     struct SetNode *newNode = malloc(sizeof(struct SetNode));
 
     if (newNode == NULL)
@@ -435,10 +543,10 @@ int SADD(struct Entry *table[], char key[], char value[]){
     }
 
     strcpy(newNode->value, value);
-    newNode->next = NULL;
-    newEntry->type = TYPE_SET;
-    newEntry->value = newNode;
-    newEntry->next = table[x];
+    newNode -> next = NULL;
+    newEntry -> type = TYPE_SET;
+    newEntry -> value = newNode;
+    newEntry -> next = table[x];
     table[x] = newEntry;
     return 1;
 }
@@ -450,30 +558,35 @@ int SREM(struct Entry *table[], char key[],char value[])
     struct Entry *prev = NULL;
     while (current != NULL)
     {
-        if (strcmp(current->key, key) == 0)
+        if (strcmp(current -> key, key) == 0)
         {
-            if (current->type != TYPE_SET)
+            if (current -> type != TYPE_SET)
             {
                 printf("Wrong data type\n");
                 return -1;
             }
-            struct SetNode * currentNode=(struct SetNode *)current->value;
-            struct SetNode * prevNode=NULL;
-            while(currentNode!=NULL){
-                if(strcmp(currentNode->value,value)==0){
+            struct SetNode * currentNode = (struct SetNode *)current->value;
+            struct SetNode * prevNode = NULL;
+            while(currentNode != NULL){
+
+                if(strcmp(currentNode -> value, value) ==0){
                     break;
                 }
-                prevNode=currentNode;
-                currentNode=currentNode->next;
+                prevNode = currentNode;
+                currentNode = currentNode -> next;
             }
-            if(currentNode==NULL){
+
+            if(currentNode == NULL){
                 return -1;
             }
-            if(currentNode->next==NULL){
-                if(prevNode==NULL){
-                    if(prev==NULL){
-                        table[x]=current->next;
-                        current->next=NULL;
+
+            if(currentNode -> next == NULL){
+
+                if(prevNode == NULL){
+
+                    if(prev == NULL){
+                        table[x] = current -> next;
+                        current -> next = NULL;
                         free(currentNode);
                         free(current);
                         return 1;
@@ -485,18 +598,19 @@ int SREM(struct Entry *table[], char key[],char value[])
                     return 1;
                 }
             }
-            if(prevNode==NULL){
-                current->value=currentNode->next;
-                currentNode->next=NULL;
+
+            if(prevNode == NULL){
+                current -> value = currentNode -> next;
+                currentNode -> next = NULL;
                 free(currentNode);
                 return 1;
             }
-            prevNode->next=currentNode->next;
-            currentNode->next=NULL;
+            prevNode -> next = currentNode -> next;
+            currentNode -> next = NULL;
             free(currentNode);
             return 1;
         }
-        prev=current;
+        prev = current;
         current = current->next;
     }
     printf("Entry not found");
@@ -509,25 +623,27 @@ void SISMEMBER(struct Entry *table[], char key[],char value[])
     struct Entry *current = table[x];
     while (current != NULL)
     {
-        if (strcmp(current->key, key) == 0)
+        if (strcmp(current -> key, key) == 0)
         {
-            if (current->type != TYPE_SET)
+            if (current -> type != TYPE_SET)
             {
                 printf("Wrong data type\n");
                 return;
             }
-            struct SetNode * currentNode=(struct SetNode *)current->value;
-            while(currentNode!=NULL){
-                if(strcmp(currentNode->value,value)==0){
+            struct SetNode * currentNode = (struct SetNode *)current -> value;
+
+            while(currentNode != NULL){
+
+                if(strcmp(currentNode -> value,value) ==0){
                     printf("value Exists");
                     return;
                 }
-                currentNode=currentNode->next;
+                currentNode = currentNode -> next;
             }
             printf("Value Does Not Exists");
             return;
         }
-        current = current->next;
+        current = current -> next;
     }
     printf("Entry not found");
     return;
@@ -537,24 +653,26 @@ void SMEMBERS(struct Entry *table[], char key[])
 {
     int x = getIndex(key);
     struct Entry *current = table[x];
+
     while (current != NULL)
     {
-        if (strcmp(current->key, key) == 0)
+        if (strcmp(current -> key, key) == 0)
         {
-            if (current->type != TYPE_SET)
+            if (current -> type != TYPE_SET)
             {
                 printf("Wrong data type\n");
                 return;
             }
             struct SetNode * currentNode=(struct SetNode *)current->value;
-            while(currentNode!=NULL){
-                printf("%s->",currentNode->value);
-                currentNode=currentNode->next;
+
+            while(currentNode != NULL){
+                printf("%s->",currentNode -> value);
+                currentNode=currentNode -> next;
             }
             printf("null\n");
             return;
         }
-        current = current->next;
+        current = current -> next;
     }
     printf("Entry not found");
     return;
@@ -563,83 +681,95 @@ void SMEMBERS(struct Entry *table[], char key[])
 int HSET(struct Entry *table[], char key[],char field[],char value[]){
     int x=getIndex(key);
     struct Entry *current=table[x];
-    while(current!=NULL){
-        if(strcmp(current->key,key)==0){
-            if (current->type != TYPE_HASH)
+
+    while(current != NULL){
+
+        if(strcmp(current -> key, key)==0){
+
+            if (current -> type != TYPE_HASH)
             {
                 printf("Wrong data type\n");
                 return -1;
             }
             struct HashNode *currentNode=(struct HashNode *)current->value;
-            struct HashNode *temp=currentNode;
-            while(temp!=NULL){
-                if(strcmp(temp->field,field)==0){
-                    strcpy(temp->value,value);
+            struct HashNode *temp = currentNode;
+
+            while(temp != NULL){
+
+                if(strcmp(temp -> field, field)==0){
+                    strcpy(temp -> value, value);
                     return 1;
                 }
-                temp=temp->next;
+                temp = temp -> next;
             }
-            struct HashNode * newNode=malloc(sizeof(struct HashNode));
+            struct HashNode * newNode = malloc(sizeof(struct HashNode));
+
             if (newNode == NULL)
             {
                 printf("Memory allocation failed\n");
                 return -1;
             }
-            strcpy(newNode->field,field);
-            strcpy(newNode->value,value);
-            newNode->next=currentNode;
-            current->value=newNode;
+            strcpy(newNode -> field, field);
+            strcpy(newNode -> value, value);
+            newNode -> next = currentNode;
+            current -> value = newNode;
             return 1;
         }
-        current=current->next;
+        current = current -> next;
     }
     struct Entry *newEntry = malloc(sizeof(struct Entry));
+
     if (newEntry == NULL)
     {
         printf("Memory allocation failed\n");
         return -1;
     }
     struct HashNode *newNode = malloc(sizeof(struct HashNode));
+
     if (newNode == NULL)
     {
         printf("Memory allocation failed\n");
         free(newEntry);
         return -1;
     }
-    strcpy(newNode->field,field);
-    strcpy(newNode->value,value);
-    newNode->next = NULL;
-    newEntry->next=table[x];
-    strcpy(newEntry->key,key);
-    newEntry->type=TYPE_HASH;
-    newEntry->value=newNode;
-    table[x]=newEntry;
+    strcpy(newNode -> field,field);
+    strcpy(newNode -> value,value);
+    newNode -> next = NULL;
+    newEntry -> next = table[x];
+    strcpy(newEntry -> key,key);
+    newEntry -> type = TYPE_HASH;
+    newEntry -> value = newNode;
+    table[x] = newEntry;
     return 1;
 
 }
 // ********************************************HGET********************************************
 void HGET(struct Entry *table[], char key[],char field[]){
     int x=getIndex(key);
-    struct Entry *current=table[x];
+    struct Entry *current = table[x];
+
     while(current!=NULL){
-        if(strcmp(current->key,key)==0){
-            if (current->type != TYPE_HASH)
+
+        if(strcmp(current -> key, key)==0){
+
+            if (current -> type != TYPE_HASH)
             {
                 printf("Wrong data type\n");
                 return;
             }
-            struct HashNode *currentNode=(struct HashNode *)current->value;
+            struct HashNode *currentNode = (struct HashNode *)current->value;
+
             while(currentNode!=NULL){
-                if(strcmp(currentNode->field,field)==0){
-                    printf("value: %s\n",currentNode->value);
+                if(strcmp(currentNode -> field, field)==0){
+                    printf("value: %s\n",currentNode -> value);
                     return;
                 }
-                currentNode=currentNode->next;
+                currentNode = currentNode->next;
             }
             printf("feild not found\n");
             return;
         }
-        current=current->next;
+        current = current -> next;
     }
     printf("entry not found");
     return;
@@ -651,18 +781,18 @@ int HDEL(struct Entry *table[], char key[], char field[]){
     struct Entry *prev = NULL;
     while (current != NULL)
     {
-        if (strcmp(current->key, key) == 0)
+        if (strcmp(current -> key, key) == 0)
         {
-            if (current->type != TYPE_HASH)
+            if (current -> type != TYPE_HASH)
             {
                 printf("Wrong data type\n");
                 return -1;
             }
-            struct HashNode *currentNode =(struct HashNode *)current->value;
+            struct HashNode *currentNode = (struct HashNode *)current->value;
             struct HashNode *prevNode = NULL;
             while (currentNode != NULL)
             {
-                if (strcmp(currentNode->field, field) == 0)
+                if (strcmp(currentNode -> field, field) == 0)
                 {
                     break;
                 }
@@ -674,15 +804,15 @@ int HDEL(struct Entry *table[], char key[], char field[]){
                 printf("Field not found\n");
                 return -1;
             }
-            if (currentNode->next == NULL && prevNode == NULL)
+            if (currentNode -> next == NULL && prevNode == NULL)
             {
                 if (prev == NULL)
                 {
-                    table[x] = current->next;
+                    table[x] = current -> next;
                 }
                 else
                 {
-                    prev->next = current->next;
+                    prev -> next = current -> next;
                 }
                 free(currentNode);
                 free(current);
@@ -708,19 +838,21 @@ int HDEL(struct Entry *table[], char key[], char field[]){
 void HGETALL(struct Entry *table[], char key[]){
     int x = getIndex(key);
     struct Entry *current = table[x];
+
     while (current != NULL)
     {
-        if (strcmp(current->key, key) == 0)
+        if (strcmp(current -> key, key) == 0)
         {
-            if (current->type != TYPE_HASH)
+            if (current -> type != TYPE_HASH)
             {
                 printf("Wrong data type\n");
                 return;
             }
-            struct HashNode *currentNode =(struct HashNode *)current->value;
+            struct HashNode *currentNode = (struct HashNode *)current->value;
+
             while (currentNode != NULL)
             {
-                printf("%s : %s\n",currentNode->field,currentNode->value);
+                printf("%s : %s\n", currentNode -> field, currentNode -> value);
                 currentNode = currentNode->next;
             }
             return;
@@ -753,6 +885,7 @@ void LoadDatabase(struct Entry *table[])
         char *arr[10];
         int count = 0;
         char *token = strtok(command, " \t\n");
+
         while (token != NULL && count < 10)
         {
             arr[count] = token;
@@ -806,11 +939,246 @@ void LoadDatabase(struct Entry *table[])
     }
     fclose(file);
 }
+struct Entry *copyEntry(struct Entry *original)
+{
+    if (original == NULL)
+    {
+        return NULL;
+    }
+
+    struct Entry *newEntry = malloc(sizeof(struct Entry));
+
+    if (newEntry == NULL)
+    {
+        printf("Memory allocation failed\n");
+        return NULL;
+    }
+
+    strcpy(newEntry -> key, original -> key);
+    newEntry -> type = original->type;
+    newEntry -> next = NULL;
+
+    if (original -> type == TYPE_STRING)
+    {
+        newEntry->value = malloc(strlen((char *)original->value) + 1);
+
+        if (newEntry->value == NULL)
+        {
+            printf("Memory allocation failed\n");
+            free(newEntry);
+            return NULL;
+        }
+
+        strcpy((char *)newEntry->value,(char *)original->value);
+    }
+
+    else if (original -> type == TYPE_LIST)
+    {
+        struct ListNode *originalNode =(struct ListNode *)original->value;
+        struct ListNode *newHead = NULL;
+        struct ListNode *newTail = NULL;
+
+        while (originalNode != NULL)
+        {
+            struct ListNode *newNode =malloc(sizeof(struct ListNode));
+
+            if (newNode == NULL)
+            {
+                printf("Memory allocation failed\n");
+
+                struct ListNode *temp = newHead;
+
+                while (temp != NULL)
+                {
+                    struct ListNode *next = temp->next;
+                    free(temp);
+                    temp = next;
+                }
+                free(newEntry);
+                return NULL;
+            }
+
+            strcpy(newNode -> value, originalNode -> value);
+            newNode->next = NULL;
+
+            if (newHead == NULL)
+            {
+                newHead = newNode;
+                newTail = newNode;
+            }
+            else
+            {
+                newTail -> next = newNode;
+                newTail = newNode;
+            }
+            originalNode = originalNode->next;
+        }
+        newEntry->value = newHead;
+    }   
+
+    else if (original -> type == TYPE_SET)
+    {
+        struct SetNode *originalNode =(struct SetNode *)original->value;
+        struct SetNode *newHead = NULL;
+        struct SetNode *newTail = NULL;
+
+        while (originalNode != NULL)
+        {
+            struct SetNode *newNode =malloc(sizeof(struct SetNode));
+
+            if (newNode == NULL)
+            {
+                printf("Memory allocation failed\n");
+                struct SetNode *temp = newHead;
+
+                while (temp != NULL)
+                {
+                    struct SetNode *next = temp->next;
+                    free(temp);
+                    temp = next;
+                }
+                free(newEntry);
+                return NULL;
+            }
+            strcpy(newNode -> value, originalNode -> value);
+            newNode -> next = NULL;
+            if (newHead == NULL)
+            {
+                newHead = newNode;
+                newTail = newNode;
+            }
+            else
+            {
+                newTail -> next = newNode;
+                newTail = newNode;
+            }
+
+            originalNode = originalNode->next;
+        }
+
+        newEntry -> value = newHead;
+    }
+
+    else if (original -> type == TYPE_HASH)
+    {
+        struct HashNode *originalNode = (struct HashNode *)original -> value;
+        struct HashNode *newHead = NULL;
+        struct HashNode *newTail = NULL;
+
+        while (originalNode != NULL)
+        {
+            struct HashNode *newNode = malloc(sizeof(struct HashNode));
+
+            if (newNode == NULL)
+            {
+                printf("Memory allocation failed\n");
+                struct HashNode *temp = newHead;
+
+                while (temp != NULL)
+                {
+                    struct HashNode *next = temp->next;
+                    free(temp);
+                    temp = next;
+                }
+                free(newEntry);
+                return NULL;
+            }
+            strcpy(newNode -> field, originalNode -> field);
+            strcpy(newNode -> value, originalNode -> value);
+            newNode -> next = NULL;
+
+            if (newHead == NULL)
+            {
+                newHead = newNode;
+                newTail = newNode;
+            }
+
+            else
+            {
+                newTail->next = newNode;
+                newTail = newNode;
+            }
+            originalNode = originalNode->next;
+        }
+        newEntry->value = newHead;
+    }
+    return newEntry;
+}
+int copyTable(struct Entry *table[], struct Entry *snapshot[])
+{
+    for (int i = 0; i < TABLE_SIZE; i++)
+    {
+        snapshot[i] = NULL;
+
+        struct Entry *current = table[i];
+        struct Entry *prevCopy = NULL;
+
+        while (current != NULL)
+        {
+            struct Entry *newEntry = copyEntry(current);
+
+            if (newEntry == NULL)
+            {
+                return -1;
+            }
+
+            if (snapshot[i] == NULL)
+            {
+                snapshot[i] = newEntry;
+            }
+
+            else
+            {
+                prevCopy -> next = newEntry;
+            }
+
+            prevCopy = newEntry;
+            current = current -> next;
+        }
+    }
+
+    return 1;
+}
+void BEGIN(struct Entry *table[], struct Transaction *transaction)
+{
+    if (transaction -> active)
+    {
+        printf("Transaction already active\n");
+        return;
+    }
+    int result = copyTable(table, transaction -> snapshot);
+
+    if (result == -1)
+    {
+        printf("Could not start transaction\n");
+        return;
+    }
+    transaction -> active = 1;
+    printf("Transaction started\n");
+}
+void ROLLBACK(struct Entry *table[], struct Transaction *transaction)
+{
+    if (!transaction -> active)
+    {
+        printf("No active transaction\n");
+        return;
+    }
+    freeTable(table);
+    for (int i = 0; i < TABLE_SIZE; i++)
+    {
+        table[i] = transaction->snapshot[i];
+        transaction -> snapshot[i] = NULL;
+    }
+
+    transaction -> active = 0;
+    printf("Transaction rolled back\n");
+}
 int main()
 {
     char input[100];
     char originalCommand[100];
     struct Entry *table[TABLE_SIZE] = {NULL};
+    struct Transaction transaction = {0};
     LoadDatabase(table);
     while (1)
     {
@@ -1033,6 +1401,18 @@ int main()
             HGETALL(table, arr[1]);
         }
 // ********************************************DEFAULT********************************************
+        else if (strcmp(arr[0], "BEGIN") == 0 && count == 1)
+        {
+            BEGIN(table, &transaction);
+        }
+        else if (strcmp(arr[0], "COMMIT") == 0 && count == 1)
+        {
+            COMMIT(&transaction);
+        }
+        else if (strcmp(arr[0], "ROLLBACK") == 0 && count == 1)
+        {
+            ROLLBACK(table, &transaction);
+        }
         else
         {
             printf("Unknown command\n");
