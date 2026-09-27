@@ -1,1 +1,15 @@
+# Build outputs
+build/
+*.o
+*.obj
 *.exe
+MiniReddis
+
+# Runtime data
+Database.txt
+
+# Editor and operating-system files
+.vscode/
+.vs/
+.DS_Store
+Thumbs.db
