@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #define TABLE_SIZE 10
 struct ListNode {
     char value[100];
@@ -29,6 +30,7 @@ struct Entry {
     char key[50];
     enum DataType type;
     void *value;
+    time_t expiry;
     struct Entry *next;
 };
 
@@ -37,7 +39,20 @@ struct Transaction
     int active;
     struct Entry *snapshot[TABLE_SIZE];
 };
+int isExpired(struct Entry *entry)
+{
+    if (entry -> expiry == 0)
+    {
+        return 0;
+    }
 
+    if (time(NULL) >= entry->expiry)
+    {
+        return 1;
+    }
+
+    return 0;
+}
 unsigned long hashFunction(char key[])
 {
     unsigned long hash = 0;
@@ -100,6 +115,7 @@ int insertEntry(struct Entry *table[], char key[], char value[])
     strcpy((char *)newEntry->value, value);
     newEntry -> type=TYPE_STRING;
     newEntry -> next = table[x];
+    newEntry->expiry = 0;
     table[x] = newEntry;
     return 1;
 }
@@ -172,6 +188,42 @@ void freeTable(struct Entry *table[])
         table[i] = NULL;
     }
 }
+// **********************************************DEL***********************************************
+int deleteEntry(struct Entry *table[], char key[]){
+    int x=getIndex(key);
+    struct Entry *current = table[x];
+
+    if(current == NULL){
+        printf("Entry not found\n");
+        return -1;
+    }
+
+   if (current->next == NULL)
+    {
+        if (strcmp(current->key, key) == 0)
+        {
+            table[x] = NULL;
+            current->next = NULL;
+            freeEntry(current);
+            return 1;
+        }
+        printf("Entry not found\n");
+        return -1;
+    }
+    while(current->next!=NULL){
+
+        if(strcmp(current -> next -> key,key)==0){
+            struct Entry *temp=current -> next;
+            current->next = current ->next->next;
+            temp -> next = NULL;
+            freeEntry(temp);
+            return 1;
+        }
+        current=current->next;
+    }
+    printf("Entry not found\n");
+    return -1;
+}
 // **********************************************GET***********************************************
 void getEntry(struct Entry *table[], char key[])
 {
@@ -182,6 +234,12 @@ void getEntry(struct Entry *table[], char key[])
 
         if(strcmp(current -> key,key)==0){
 
+            if (isExpired(current))
+            {
+                deleteEntry(table, key);
+                printf("Key expired\n");
+                return;
+            }
             if (current -> type != TYPE_STRING)
             {
                 printf("Wrong data type\n");
@@ -208,50 +266,6 @@ void COMMIT(struct Transaction *transaction)
 
     printf("Transaction committed\n");
 }
-// **********************************************DEL***********************************************
-int deleteEntry(struct Entry *table[], char key[]){
-    int x=getIndex(key);
-    struct Entry *current = table[x];
-
-    if(current == NULL){
-        printf("Entry not found\n");
-        return -1;
-    }
-
-    if(current -> next == NULL){
-
-         if(strcmp(current -> key,key)==0){
-
-            if (current -> type != TYPE_STRING)
-            {
-                printf("Wrong data type\n");
-                return -1;
-            }
-            table[x] = current -> next;
-            current -> next = NULL;
-            free(current -> value);
-            free(current);
-            return 1;
-         }
-         printf("Entry not found\n");
-         return -1;
-    }
-
-    while(current->next!=NULL){
-
-        if(strcmp(current -> next -> key,key)==0){
-            struct Entry *temp=current -> next;
-            current -> next=current -> next -> next;
-            temp -> next = NULL;
-            free(temp -> value);
-            free(temp);
-            return 1;
-        }
-        current=current->next;
-    }
-    printf("Entry not found\n");
-    return -1;
-}
 // ******************************************LPUSH***************************************************
 int LPUSH(struct Entry *table[], char key[], char value[])
 {
@@ -262,6 +276,12 @@ int LPUSH(struct Entry *table[], char key[], char value[])
     {
         if (strcmp(current -> key, key) == 0)
         {
+            if (isExpired(current))
+            {
+                deleteEntry(table, key);
+                printf("Key expired\n");
+                return -1;
+            }
             if (current -> type != TYPE_LIST)
             {
                 printf("Wrong data type\n");
@@ -305,6 +325,7 @@ int LPUSH(struct Entry *table[], char key[], char value[])
     newEntry -> type = TYPE_LIST;
     newEntry -> value = newNode;
     newEntry -> next = table[x];
+    newEntry->expiry = 0;
     table[x] = newEntry;
     return 1;
 }
@@ -318,6 +339,12 @@ int RPUSH(struct Entry *table[], char key[], char value[])
     {
         if (strcmp(current -> key, key) == 0)
         {
+             if (isExpired(current))
+            {
+                deleteEntry(table, key);
+                printf("Key expired\n");
+                return -1;
+            }
             if (current -> type != TYPE_LIST)
             {
                 printf("Wrong data type\n");
@@ -366,6 +393,7 @@ int RPUSH(struct Entry *table[], char key[], char value[])
     newEntry -> type = TYPE_LIST;
     newEntry -> value = newNode;
     newEntry -> next = table[x];
+    newEntry->expiry = 0;
     table[x] = newEntry;
     return 1;
 }
@@ -379,6 +407,12 @@ int LPOP(struct Entry *table[], char key[])
     {
         if (strcmp(current -> key, key) == 0)
         {
+             if (isExpired(current))
+            {
+                deleteEntry(table, key);
+                printf("Key expired\n");
+                return -1;
+            }
             if (current -> type != TYPE_LIST)
             {
                 printf("Wrong data type\n");
@@ -406,7 +440,7 @@ int LPOP(struct Entry *table[], char key[])
         prev = current;
         current = current->next;
     }
-    printf("Entry not found");
+    printf("Entry not found\n");
     return -1;
 }
 // **********************************************RPOP***********************************************
@@ -419,6 +453,12 @@ int RPOP(struct Entry *table[], char key[])
     {
         if (strcmp(current->key, key) == 0)
         {
+             if (isExpired(current))
+            {
+                deleteEntry(table, key);
+                printf("Key expired\n");
+                return -1;
+            }
             if (current->type != TYPE_LIST)
             {
                 printf("Wrong data type\n");
@@ -450,7 +490,7 @@ int RPOP(struct Entry *table[], char key[])
         prev = current;
         current = current->next;
     }
-    printf("Entry not found");
+    printf("Entry not found\n");
     return -1;
 }
 // **********************************************LRANGE***********************************************
@@ -463,6 +503,12 @@ void LRANGE(struct Entry *table[], char key[])
     {
         if (strcmp(current -> key, key) == 0)
         {
+             if (isExpired(current))
+            {
+                deleteEntry(table, key);
+                printf("Key expired\n");
+                return ;
+            }
             if (current -> type != TYPE_LIST)
             {
                 printf("Wrong data type\n");
@@ -493,6 +539,12 @@ int SADD(struct Entry *table[], char key[], char value[]){
     {
         if (strcmp(current -> key, key) == 0)
         {
+             if (isExpired(current))
+            {
+                deleteEntry(table, key);
+                printf("Key expired\n");
+                return -1;
+            }
             if (current -> type != TYPE_SET)
             {
                 printf("Wrong data type\n");
@@ -547,6 +599,7 @@ int SADD(struct Entry *table[], char key[], char value[]){
     newEntry -> type = TYPE_SET;
     newEntry -> value = newNode;
     newEntry -> next = table[x];
+    newEntry->expiry = 0;
     table[x] = newEntry;
     return 1;
 }
@@ -560,6 +613,12 @@ int SREM(struct Entry *table[], char key[],char value[])
     {
         if (strcmp(current -> key, key) == 0)
         {
+             if (isExpired(current))
+            {
+                deleteEntry(table, key);
+                printf("Key expired\n");
+                return -1;
+            }
             if (current -> type != TYPE_SET)
             {
                 printf("Wrong data type\n");
@@ -613,7 +672,7 @@ int SREM(struct Entry *table[], char key[],char value[])
         prev = current;
         current = current->next;
     }
-    printf("Entry not found");
+    printf("Entry not found\n");
     return -1;
 }
 // **********************************************SISMEMBER***********************************************
@@ -625,6 +684,12 @@ void SISMEMBER(struct Entry *table[], char key[],char value[])
     {
         if (strcmp(current -> key, key) == 0)
         {
+             if (isExpired(current))
+            {
+                deleteEntry(table, key);
+                printf("Key expired\n");
+                return ;
+            }
             if (current -> type != TYPE_SET)
             {
                 printf("Wrong data type\n");
@@ -645,7 +710,7 @@ void SISMEMBER(struct Entry *table[], char key[],char value[])
         }
         current = current -> next;
     }
-    printf("Entry not found");
+    printf("Entry not found\n");
     return;
 }
 // **********************************************SMEMBERS***********************************************
@@ -658,6 +723,12 @@ void SMEMBERS(struct Entry *table[], char key[])
     {
         if (strcmp(current -> key, key) == 0)
         {
+             if (isExpired(current))
+            {
+                deleteEntry(table, key);
+                printf("Key expired\n");
+                return ;
+            }
             if (current -> type != TYPE_SET)
             {
                 printf("Wrong data type\n");
@@ -674,7 +745,7 @@ void SMEMBERS(struct Entry *table[], char key[])
         }
         current = current -> next;
     }
-    printf("Entry not found");
+    printf("Entry not found\n");
     return;
 }
 // ********************************************HSET*******************************************
@@ -686,6 +757,12 @@ int HSET(struct Entry *table[], char key[],char field[],char value[]){
 
         if(strcmp(current -> key, key)==0){
 
+             if (isExpired(current))
+            {
+                deleteEntry(table, key);
+                printf("Key expired\n");
+                return -1;
+            }
             if (current -> type != TYPE_HASH)
             {
                 printf("Wrong data type\n");
@@ -739,6 +816,7 @@ int HSET(struct Entry *table[], char key[],char field[],char value[]){
     strcpy(newEntry -> key,key);
     newEntry -> type = TYPE_HASH;
     newEntry -> value = newNode;
+    newEntry->expiry = 0;
     table[x] = newEntry;
     return 1;
 
@@ -752,6 +830,12 @@ void HGET(struct Entry *table[], char key[],char field[]){
 
         if(strcmp(current -> key, key)==0){
 
+             if (isExpired(current))
+            {
+                deleteEntry(table, key);
+                printf("Key expired\n");
+                return ;
+            }
             if (current -> type != TYPE_HASH)
             {
                 printf("Wrong data type\n");
@@ -771,7 +855,7 @@ void HGET(struct Entry *table[], char key[],char field[]){
         }
         current = current -> next;
     }
-    printf("entry not found");
+    printf("entry not found\n");
     return;
 }
 // ********************************************HDEL********************************************
@@ -783,6 +867,12 @@ int HDEL(struct Entry *table[], char key[], char field[]){
     {
         if (strcmp(current -> key, key) == 0)
         {
+             if (isExpired(current))
+            {
+                deleteEntry(table, key);
+                printf("Key expired\n");
+                return -1;
+            }
             if (current -> type != TYPE_HASH)
             {
                 printf("Wrong data type\n");
@@ -843,6 +933,12 @@ void HGETALL(struct Entry *table[], char key[]){
     {
         if (strcmp(current -> key, key) == 0)
         {
+             if (isExpired(current))
+            {
+                deleteEntry(table, key);
+                printf("Key expired\n");
+                return ;
+            }
             if (current -> type != TYPE_HASH)
             {
                 printf("Wrong data type\n");
@@ -957,7 +1053,7 @@ struct Entry *copyEntry(struct Entry *original)
     strcpy(newEntry -> key, original -> key);
     newEntry -> type = original->type;
     newEntry -> next = NULL;
-
+    newEntry->expiry = original->expiry;
     if (original -> type == TYPE_STRING)
     {
         newEntry->value = malloc(strlen((char *)original->value) + 1);
@@ -1173,6 +1269,51 @@ void ROLLBACK(struct Entry *table[], struct Transaction *transaction)
     transaction -> active = 0;
     printf("Transaction rolled back\n");
 }
+void EXPIRE(struct Entry *table[], char key[], int seconds)
+{
+    int x = getIndex(key);
+
+    struct Entry *current = table[x];
+
+    while (current != NULL)
+    {
+        if (strcmp(current -> key, key) == 0)
+        {
+            current -> expiry = time(NULL) + seconds;
+
+            printf("Key will expire in %d seconds\n", seconds);
+            return;
+        }
+
+        current = current->next;
+    }
+
+    printf("Entry not found\n");
+}
+int TTL(struct Entry *table[], char key[])
+{
+    int x = getIndex(key);
+    struct Entry *current = table[x];
+
+    while (current != NULL)
+    {
+        if (strcmp(current->key, key) == 0)
+        {
+            if (isExpired(current))
+            {
+                deleteEntry(table, key);
+                return -2;
+            }
+            if (current->expiry == 0)
+            {
+                return -1;
+            }
+            return (int)(current->expiry - time(NULL));
+        }
+        current = current->next;
+    }
+    return -2;
+}
 int main()
 {
     char input[100];
@@ -1183,11 +1324,21 @@ int main()
     while (1)
     {
         printf("> ");
-        fgets(input, sizeof(input), stdin);
+        if (fgets(input, sizeof(input), stdin) == NULL)
+        {
+            break;
+        }
+        if (strchr(input, '\n') == NULL)
+        {
+            int c;
+            while ((c = getchar()) != '\n' && c != EOF){}
+            printf("Command too long\n");
+            continue;
+        }
         strcpy(originalCommand, input);
         originalCommand[strcspn(originalCommand, "\n")] = '\0';
         input[strcspn(input, "\n")] = '\0';
-        if (strcmp(input, "exit\n") == 0)
+        if (strcmp(input, "exit") == 0)
         {
             return 0;
         }
@@ -1412,6 +1563,14 @@ int main()
         else if (strcmp(arr[0], "ROLLBACK") == 0 && count == 1)
         {
             ROLLBACK(table, &transaction);
+        }
+        else if (strcmp(arr[0], "EXPIRE") == 0 && count == 3)
+        {
+            EXPIRE(table, arr[1], atoi(arr[2]));
+        }
+        else if (strcmp(arr[0], "TTL") == 0 && count == 2)
+        {
+            printf("%d\n", TTL(table, arr[1]));
         }
         else
         {

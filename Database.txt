@@ -1,15 +1,39 @@
 SET name Sansar
+LPUSH skills C
+SADD languages Java
+HSET user age 21
 SET name Kakkar
+LPUSH skills Python
+SADD languages C
+HSET user age 22
+SET name Sansar
+LPUSH skills C
+SADD languages Java
+HSET user age 21
+SET name Kakkar
+LPUSH skills Python
+SET name Sansar
+LPUSH skills C
+HSET user age 21
+SET name Kakkar
+HSET user age 22
+SET name Sansar
+LPUSH skills C
+HSET user age 21
+LPUSH skills Python
+SET name Sansar
 SET city Delhi
-DEL city
+SET city Delhi
+SET city Delhi
 SET name Sansar
 LPUSH skills C
 LPUSH skills Java
-RPUSH skills Python
-SADD languages C
-SADD languages Java
-SADD languages Python
-HSET user name Sansar
-HSET user age 21
-HSET user city Delhi
-SET age 49
+LPUSH skills Python
+SET temp hello
+LPUSH numbers 10
+LPOP numbers
+SADD colors red
+SREM colors red
+SET name1 value1
+SET name2 value2
+DEL name1
