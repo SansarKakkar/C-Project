@@ -37,3 +37,7 @@ SREM colors red
 SET name1 value1
 SET name2 value2
 DEL name1
+SET age 20
+SET age 54
+LPUSH skills c
+LPUSH skills c
